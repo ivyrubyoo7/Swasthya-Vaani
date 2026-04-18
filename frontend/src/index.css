@@ -1,0 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Outfit:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  html { @apply bg-slate-50 dark:bg-slate-900; }
+}
+
+@layer utilities {
+  .wave-bar { @apply rounded-full bg-brand-600 dark:bg-brand-400 transition-all duration-200; width: 4px; }
+  .wave-bar:nth-child(1) { animation-delay: 0.0s; }
+  .wave-bar:nth-child(2) { animation-delay: 0.12s; }
+  .wave-bar:nth-child(3) { animation-delay: 0.24s; }
+  .wave-bar:nth-child(4) { animation-delay: 0.36s; }
+  .wave-bar:nth-child(5) { animation-delay: 0.20s; }
+  .wave-bar:nth-child(6) { animation-delay: 0.08s; }
+  .wave-bar:nth-child(7) { animation-delay: 0.32s; }
+}
