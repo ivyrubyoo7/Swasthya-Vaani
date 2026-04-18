@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+frontend/node_modules/
+
+# build
+build/
+frontend/build/
+
+# env files
+.env
+frontend/.env
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# custom junk
+swasthya-vaani/
+swasthya-vaani.zip
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
