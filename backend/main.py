@@ -7,7 +7,7 @@ from services.audio_service import process_audio
 from models.llm import analyze_medical_text
 from services.fhir_service import create_fhir_bundle
 
-from db import consultations_collection  # ✅ NEW
+from db import consultations_collection
 
 app = FastAPI()
 
@@ -21,6 +21,21 @@ app.add_middleware(
 )
 
 # =========================
+# 🧱 HELPER: CLEAN STRUCTURE
+# =========================
+def format_prediction(analysis):
+    return {
+        "symptoms": analysis.get("symptoms", []),
+        "diseases": analysis.get("diseases", []),
+        "medications": analysis.get("medicines", []),  # rename here
+        "dosage": analysis.get("dosage", []),
+        "advice": analysis.get("advice", []),
+        "numerical_data": analysis.get("numerical_data", []),
+        "summary": analysis.get("summary", "")
+    }
+
+
+# =========================
 # 🎤 AUDIO ENDPOINT
 # =========================
 @app.post("/upload-audio")
@@ -32,9 +47,12 @@ async def upload_audio(file: UploadFile = File(...)):
         analysis = result.get("analysis", {})
         fhir_data = result.get("fhir", {})
 
+        # 🧱 FORMAT CLEAN DATA
+        prediction = format_prediction(analysis)
+
         # 🧱 SAVE TO DB
         document = {
-            "patient_id": "unknown",  # later replace with auth/user
+            "patient_id": "unknown",
             "timestamp": datetime.utcnow(),
 
             "input": {
@@ -43,15 +61,10 @@ async def upload_audio(file: UploadFile = File(...)):
                 "file_name": file.filename
             },
 
-            "prediction": {
-                "analysis": analysis,
-                "fhir": fhir_data
-            },
+            "prediction": prediction,
+            "fhir": fhir_data,   # ✅ separate
 
-            "ground_truth": {
-                "analysis": {},
-                "summary": ""
-            }
+            "ground_truth": {}   # empty for now
         }
 
         consultations_collection.insert_one(document)
@@ -59,7 +72,7 @@ async def upload_audio(file: UploadFile = File(...)):
         return {
             "status": "success",
             "text": text,
-            "analysis": analysis,
+            "analysis": prediction,
             "fhir": fhir_data
         }
 
@@ -90,6 +103,9 @@ async def analyze_text(req: TextRequest):
         # 🏥 FHIR
         fhir_data = create_fhir_bundle(analysis)
 
+        # 🧱 FORMAT CLEAN DATA
+        prediction = format_prediction(analysis)
+
         # 🧱 SAVE TO DB
         document = {
             "patient_id": "unknown",
@@ -100,15 +116,10 @@ async def analyze_text(req: TextRequest):
                 "raw_text": req.text
             },
 
-            "prediction": {
-                "analysis": analysis,
-                "fhir": fhir_data
-            },
+            "prediction": prediction,
+            "fhir": fhir_data,
 
-            "ground_truth": {
-                "analysis": {},
-                "summary": ""
-            }
+            "ground_truth": {}
         }
 
         consultations_collection.insert_one(document)
@@ -116,7 +127,7 @@ async def analyze_text(req: TextRequest):
         return {
             "status": "success",
             "text": req.text,
-            "analysis": analysis,
+            "analysis": prediction,
             "fhir": fhir_data
         }
 

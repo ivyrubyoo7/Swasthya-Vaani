@@ -39,12 +39,15 @@ export default function Record() {
 
         {/* 🎤 MIC */}
         <div className="relative flex items-center justify-center">
+
+          {/* 🔥 FIX: pointer-events-none */}
           {recording && (
-            <span className="absolute w-24 h-24 rounded-full bg-red-400 opacity-20 animate-ping" />
+            <span className="absolute w-24 h-24 rounded-full bg-red-400 opacity-20 animate-ping pointer-events-none" />
           )}
+
           <button
             onClick={toggle}
-            className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center shadow-lg transition
+            className={`relative z-10 w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center shadow-lg transition
             ${recording ? 'bg-red-500' : 'bg-brand-600'}`}
           >
             {recording
@@ -131,7 +134,10 @@ export default function Record() {
             />
 
             <div className="flex justify-end gap-2 mt-3">
-              <button className="text-slate-600 dark:text-slate-300" onClick={() => setShowTextInput(false)}>
+              <button
+                className="text-slate-600 dark:text-slate-300"
+                onClick={() => setShowTextInput(false)}
+              >
                 Cancel
               </button>
               <button
@@ -157,7 +163,6 @@ export default function Record() {
 
             <h2 className="text-lg font-semibold mb-3">Consultation Analysis</h2>
 
-            {/* Transcript */}
             <div className="mb-4">
               <p className="text-xs text-slate-400">Transcript</p>
               <div className="bg-gray-100 dark:bg-slate-800 p-3 rounded text-sm whitespace-pre-wrap">
@@ -165,7 +170,6 @@ export default function Record() {
               </div>
             </div>
 
-            {/* Summary */}
             {analysis?.summary && (
               <div className="mb-4">
                 <p className="text-xs text-slate-400">Summary</p>
@@ -175,14 +179,12 @@ export default function Record() {
               </div>
             )}
 
-            {/* JSON */}
             {analysis && (
               <pre className="bg-black text-green-400 p-3 text-xs rounded overflow-x-auto mb-4">
                 {JSON.stringify(analysis, null, 2)}
               </pre>
             )}
 
-            {/* FHIR */}
             {fhir && (
               <div>
                 <p className="text-xs text-slate-400 mb-1">FHIR Output</p>
@@ -207,4 +209,4 @@ export default function Record() {
 
     </div>
   );
-} 
+}

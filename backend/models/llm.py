@@ -21,18 +21,30 @@ client = Groq(api_key=api_key)
 # 🧹 CLEAN OUTPUT
 # =========================
 def clean_json_output(content: str):
-    """
-    Removes markdown wrappers and extra text
-    """
-    # remove ```json ```
     cleaned = re.sub(r"```json|```", "", content)
 
-    # extract only JSON block if extra text exists
     match = re.search(r"\{.*\}", cleaned, re.DOTALL)
     if match:
         cleaned = match.group(0)
 
     return cleaned.strip()
+
+
+# =========================
+# 🧹 CLEAN LIST VALUES
+# =========================
+def clean_list(values):
+    if not isinstance(values, list):
+        return []
+
+    cleaned = []
+    for v in values:
+        if isinstance(v, str):
+            v = v.strip().lower()
+            if v:
+                cleaned.append(v)
+
+    return list(set(cleaned))
 
 
 # =========================
@@ -48,50 +60,63 @@ def empty_structure(summary=""):
         "duration": [],
         "advice": [],
         "observations": [],
+        "numerical_data": [],
         "summary": summary
     }
 
 
 # =========================
-# 🧠 MAIN FUNCTION
+# 🧠 MAIN FUNCTION (UPDATED)
 # =========================
 def analyze_medical_text(text: str):
-    """
-    Handles:
-    - Hinglish → English
-    - Medical NER
-    - Structured extraction
-    """
 
     prompt = f"""
-You are a clinical AI assistant analyzing a doctor-patient conversation.
+You are a clinical AI system.
 
-TASK:
-1. Convert Hinglish/Hindi into clean medical English
-2. Extract ALL clinical information
+You MUST follow this pipeline strictly:
 
-IMPORTANT:
-- Separate medicine, dosage, frequency, and duration clearly
-- Do NOT merge them together
+-----------------------------------
+STEP 1: TRANSLATE
+-----------------------------------
+Convert the entire conversation into clean medical English.
 
-EXTRACT:
+- Hindi/Hinglish → English
+- Use clinical terminology
+- Examples:
+  "बुखार" → "fever"
+  "पेट खराब" → "stomach upset"
+  "कमजोरी" → "weakness"
 
-- symptoms (fever, headache, etc.)
-- diseases (viral infection, etc.)
-- medicines (paracetamol, etc.)
-- dosage (500 mg, 1.5 mg)
-- frequency (twice daily, once daily)
-- duration (5 days, 3–4 days)
-- advice (bed rest, hydration)
-- observations (numbers, measurable info)
+-----------------------------------
+STEP 2: EXTRACT STRUCTURED DATA
+-----------------------------------
+From the translated English text extract:
 
+- symptoms
+- diseases (ONLY if explicitly mentioned)
+- medicines
+- dosage
+- frequency
+- duration
+- advice
+- observations
+
+-----------------------------------
+STEP 3: SUMMARY
+-----------------------------------
+Write a short clinical summary in English.
+
+-----------------------------------
 STRICT RULES:
-- Output ONLY valid JSON
-- No explanation
-- No markdown
-- Always include summary
 
-FORMAT:
+- Output MUST be in English ONLY
+- DO NOT include Hindi words
+- DO NOT hallucinate diseases
+- If missing → return empty list
+
+-----------------------------------
+OUTPUT FORMAT:
+
 {{
   "symptoms": [],
   "medicines": [],
@@ -104,6 +129,7 @@ FORMAT:
   "summary": ""
 }}
 
+-----------------------------------
 CONVERSATION:
 {text}
 """
@@ -114,31 +140,48 @@ CONVERSATION:
             messages=[
                 {
                     "role": "system",
-                    "content": "Return ONLY valid JSON. No markdown. No explanation."
+                    "content": "Return ONLY valid JSON in English."
                 },
                 {
                     "role": "user",
                     "content": prompt
                 },
             ],
-            temperature=0.2,
+            temperature=0.1,  # 🔥 more deterministic
         )
 
         content = response.choices[0].message.content.strip()
-
         print("🧠 Raw LLM Output:", content)
 
         cleaned = clean_json_output(content)
 
-        # =========================
-        # ✅ SAFE JSON PARSE
-        # =========================
         try:
             parsed = json.loads(cleaned)
 
-            # ensure all keys exist
             base = empty_structure()
             base.update(parsed)
+
+            # =========================
+            # 🧹 CLEAN ALL LIST FIELDS
+            # =========================
+            for key in [
+                "symptoms",
+                "medicines",
+                "diseases",
+                "dosage",
+                "frequency",
+                "duration",
+                "advice",
+                "observations"
+            ]:
+                base[key] = clean_list(base.get(key, []))
+
+            # =========================
+            # 🔢 NUMERICAL DATA
+            # =========================
+            base["numerical_data"] = clean_list(
+                base.get("frequency", []) + base.get("duration", [])
+            )
 
             return base
 

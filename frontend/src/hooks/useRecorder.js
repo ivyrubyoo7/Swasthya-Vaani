@@ -6,59 +6,100 @@ export function useRecorder() {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [transcript, setTranscript] = useState("");
   const [analysis, setAnalysis] = useState(null);
-  const [fhir, setFhir] = useState(null); // ✅ NEW
+  const [fhir, setFhir] = useState(null);
 
   const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
 
   // 🎤 START RECORDING
   const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    try {
+      // 🔥 USE RECORDER STATE (NOT React state)
+      if (mediaRecorderRef.current?.state === "recording") return;
 
-    const mediaRecorder = new MediaRecorder(stream);
-    mediaRecorderRef.current = mediaRecorder;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
 
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) {
-        chunksRef.current.push(e.data);
-      }
-    };
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
 
-    mediaRecorder.onstop = uploadAudio;
+      chunksRef.current = [];
 
-    mediaRecorder.start();
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
 
-    timerRef.current = setInterval(() => {
-      setTime((t) => t + 1);
-    }, 1000);
+      mediaRecorder.onstop = () => {
+        console.log("🛑 Recording stopped");
 
-    setRecording(true);
+        // stop mic
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+
+        // ensure chunks are ready before upload
+        setTimeout(() => {
+          uploadAudio();
+        }, 200);
+      };
+
+      mediaRecorder.start();
+
+      timerRef.current = setInterval(() => {
+        setTime((t) => t + 1);
+      }, 1000);
+
+      setRecording(true);
+      console.log("🎤 Recording started");
+    } catch (err) {
+      console.error("❌ Mic error:", err);
+    }
   };
 
   // 🛑 STOP RECORDING
   const stopRecording = () => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
+    const recorder = mediaRecorderRef.current;
+
+    if (!recorder) {
+      console.log("❌ No recorder");
+      return;
     }
+
+    if (recorder.state !== "recording") {
+      console.log("⚠️ Not recording:", recorder.state);
+      return;
+    }
+
+    console.log("🛑 Stop triggered");
+
+    recorder.stop();
+
     clearInterval(timerRef.current);
     setRecording(false);
     setTime(0);
   };
 
-  // 🔁 TOGGLE
+  // 🔁 TOGGLE (CRITICAL FIX)
   const toggle = () => {
-    if (recording) stopRecording();
-    else startRecording();
+    const recorder = mediaRecorderRef.current;
+
+    // 🔥 RELY ON REAL RECORDER STATE
+    if (recorder && recorder.state === "recording") {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   // 📤 MIC AUDIO → BACKEND
   const uploadAudio = async () => {
-    const blob = new Blob(chunksRef.current, { type: "audio/wav" });
+    const blob = new Blob(chunksRef.current, { type: "audio/webm" });
     chunksRef.current = [];
 
     const formData = new FormData();
-    formData.append("file", blob, "recording.wav");
+    formData.append("file", blob, "recording.webm");
 
     try {
       const res = await fetch("http://127.0.0.1:8000/upload-audio", {
@@ -71,13 +112,13 @@ export function useRecorder() {
 
       setTranscript(data.text || "");
       setAnalysis(data.analysis || null);
-      setFhir(data.fhir || null); // ✅ NEW
+      setFhir(data.fhir || null);
     } catch (err) {
       console.error("Mic upload failed", err);
     }
   };
 
-  // 📁 FILE UPLOAD → BACKEND
+  // 📁 FILE UPLOAD
   const handleUpload = async (file) => {
     if (!file) return;
 
@@ -97,13 +138,13 @@ export function useRecorder() {
 
       setTranscript(data.text || "");
       setAnalysis(data.analysis || null);
-      setFhir(data.fhir || null); // ✅ NEW
+      setFhir(data.fhir || null);
     } catch (err) {
       console.error("File upload failed", err);
     }
   };
 
-  // 📝 TEXT INPUT → BACKEND
+  // 📝 TEXT INPUT
   const handleTextInput = async (text) => {
     if (!text.trim()) return;
 
@@ -121,13 +162,13 @@ export function useRecorder() {
 
       setTranscript(data.text || "");
       setAnalysis(data.analysis || null);
-      setFhir(data.fhir || null); // ✅ NEW
+      setFhir(data.fhir || null);
     } catch (err) {
       console.error("Text analysis failed", err);
     }
   };
 
-  // ⏱️ FORMAT TIMER
+  // ⏱️ TIMER
   const formatTime = () => {
     const min = String(Math.floor(time / 60)).padStart(2, "0");
     const sec = String(time % 60).padStart(2, "0");
@@ -143,6 +184,6 @@ export function useRecorder() {
     handleTextInput,
     transcript,
     analysis,
-    fhir, // ✅ NEW
+    fhir,
   };
 }
