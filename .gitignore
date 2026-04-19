@@ -29,6 +29,9 @@ build/
 backend/recordings/
 backend/transcriptions/
 backend/analysis/
+backend/temp_outputs/
+backend/export_to_csv.py
+backend/medical_dataset.csv
 
 # ========================
 # OS FILES
