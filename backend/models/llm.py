@@ -4,11 +4,12 @@ import os
 import json
 import re
 
-# ✅ LOAD ENV FIRST
+# =========================
+# 🔐 LOAD ENV
+# =========================
 load_dotenv()
 
 api_key = os.getenv("GROQ_API_KEY")
-print("🔑 GROQ KEY LOADED:", "YES" if api_key else "NO")
 
 if not api_key:
     raise ValueError("❌ GROQ_API_KEY not found. Check your .env file.")
@@ -16,36 +17,94 @@ if not api_key:
 client = Groq(api_key=api_key)
 
 
+# =========================
+# 🧹 CLEAN OUTPUT
+# =========================
 def clean_json_output(content: str):
     """
-    Removes ```json ``` wrappers and cleans output
+    Removes markdown wrappers and extra text
     """
-    cleaned = re.sub(r"```json|```", "", content).strip()
-    return cleaned
+    # remove ```json ```
+    cleaned = re.sub(r"```json|```", "", content)
+
+    # extract only JSON block if extra text exists
+    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    if match:
+        cleaned = match.group(0)
+
+    return cleaned.strip()
 
 
+# =========================
+# 🧱 EMPTY TEMPLATE
+# =========================
+def empty_structure(summary=""):
+    return {
+        "symptoms": [],
+        "medicines": [],
+        "diseases": [],
+        "dosage": [],
+        "frequency": [],
+        "duration": [],
+        "advice": [],
+        "observations": [],
+        "summary": summary
+    }
+
+
+# =========================
+# 🧠 MAIN FUNCTION
+# =========================
 def analyze_medical_text(text: str):
     """
-    Extracts symptoms, medicines, diseases, and summary
+    Handles:
+    - Hinglish → English
+    - Medical NER
+    - Structured extraction
     """
 
     prompt = f"""
-Extract structured medical data.
+You are a clinical AI assistant analyzing a doctor-patient conversation.
+
+TASK:
+1. Convert Hinglish/Hindi into clean medical English
+2. Extract ALL clinical information
+
+IMPORTANT:
+- Separate medicine, dosage, frequency, and duration clearly
+- Do NOT merge them together
+
+EXTRACT:
+
+- symptoms (fever, headache, etc.)
+- diseases (viral infection, etc.)
+- medicines (paracetamol, etc.)
+- dosage (500 mg, 1.5 mg)
+- frequency (twice daily, once daily)
+- duration (5 days, 3–4 days)
+- advice (bed rest, hydration)
+- observations (numbers, measurable info)
 
 STRICT RULES:
-- Return ONLY valid JSON
-- No markdown, no explanation
-- Always include a meaningful summary (even if non-medical)
+- Output ONLY valid JSON
+- No explanation
+- No markdown
+- Always include summary
 
 FORMAT:
 {{
   "symptoms": [],
   "medicines": [],
   "diseases": [],
+  "dosage": [],
+  "frequency": [],
+  "duration": [],
+  "advice": [],
+  "observations": [],
   "summary": ""
 }}
 
-Text:
+CONVERSATION:
 {text}
 """
 
@@ -53,10 +112,16 @@ Text:
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "Return only JSON. No markdown."},
-                {"role": "user", "content": prompt},
+                {
+                    "role": "system",
+                    "content": "Return ONLY valid JSON. No markdown. No explanation."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                },
             ],
-            temperature=0,
+            temperature=0.2,
         )
 
         content = response.choices[0].message.content.strip()
@@ -65,24 +130,22 @@ Text:
 
         cleaned = clean_json_output(content)
 
-        return json.loads(cleaned)
+        # =========================
+        # ✅ SAFE JSON PARSE
+        # =========================
+        try:
+            parsed = json.loads(cleaned)
 
-    except json.JSONDecodeError as e:
-        print("⚠️ JSON parse failed:", e)
+            # ensure all keys exist
+            base = empty_structure()
+            base.update(parsed)
 
-        return {
-            "symptoms": [],
-            "medicines": [],
-            "diseases": [],
-            "summary": cleaned if 'cleaned' in locals() else content
-        }
+            return base
+
+        except json.JSONDecodeError as e:
+            print("⚠️ JSON parse failed:", e)
+            return empty_structure(summary=cleaned)
 
     except Exception as e:
         print("❌ Groq Error:", e)
-
-        return {
-            "symptoms": [],
-            "medicines": [],
-            "diseases": [],
-            "summary": ""
-        }
+        return empty_structure()

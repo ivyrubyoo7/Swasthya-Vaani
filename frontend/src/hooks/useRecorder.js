@@ -6,6 +6,7 @@ export function useRecorder() {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [transcript, setTranscript] = useState("");
   const [analysis, setAnalysis] = useState(null);
+  const [fhir, setFhir] = useState(null); // ✅ NEW
 
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -19,7 +20,9 @@ export function useRecorder() {
     mediaRecorderRef.current = mediaRecorder;
 
     mediaRecorder.ondataavailable = (e) => {
-      chunksRef.current.push(e.data);
+      if (e.data.size > 0) {
+        chunksRef.current.push(e.data);
+      }
     };
 
     mediaRecorder.onstop = uploadAudio;
@@ -35,7 +38,9 @@ export function useRecorder() {
 
   // 🛑 STOP RECORDING
   const stopRecording = () => {
-    mediaRecorderRef.current.stop();
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+    }
     clearInterval(timerRef.current);
     setRecording(false);
     setTime(0);
@@ -66,6 +71,7 @@ export function useRecorder() {
 
       setTranscript(data.text || "");
       setAnalysis(data.analysis || null);
+      setFhir(data.fhir || null); // ✅ NEW
     } catch (err) {
       console.error("Mic upload failed", err);
     }
@@ -91,6 +97,7 @@ export function useRecorder() {
 
       setTranscript(data.text || "");
       setAnalysis(data.analysis || null);
+      setFhir(data.fhir || null); // ✅ NEW
     } catch (err) {
       console.error("File upload failed", err);
     }
@@ -114,6 +121,7 @@ export function useRecorder() {
 
       setTranscript(data.text || "");
       setAnalysis(data.analysis || null);
+      setFhir(data.fhir || null); // ✅ NEW
     } catch (err) {
       console.error("Text analysis failed", err);
     }
@@ -132,8 +140,9 @@ export function useRecorder() {
     formatTime,
     uploadedFile,
     handleUpload,
-    handleTextInput, // ✅ NEW
+    handleTextInput,
     transcript,
     analysis,
+    fhir, // ✅ NEW
   };
 }
